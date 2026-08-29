@@ -59,6 +59,12 @@
 
 版本檢查無法連線時會靜默跳過，不會影響遊戲啟動或自動化功能。
 
+### AbyssMod 簡體中文漢化相容
+
+發布內容包含 `BepInEx/plugins/AbyssSniff/AbyssSniff.LocalizationCompat.dll`。安裝 [AbyssMod](https://github.com/anosu/AbyssMod) 及其簡體中文翻譯後，兼容插件會從本機 `BepInEx/plugins/AbyssMod/cache/*/static.json` 和 `ui_texts.json` 建立中日雙向別名，讓自動深淵、Code 類別與按鈕判定繼續工作，也讓 `force_chain_allow_names` 的中文或日文水晶名稱互相匹配。
+
+兼容插件不連線、不修改漢化檔案，也不新增 `reroll_config.json` 欄位；沒有漢化快取時會保持原本的日文行為。快取稍後產生或更新會自動重載，缺失或損壞則安全跳過。若功能沒有生效，請確認上述快取路徑存在，並在 `BepInEx/LogOutput.log` 搜尋 `[LocalizationCompat]`。完整技術說明與驗收清單見 [AbyssMod 中日名稱相容層](docs/localization-compatibility.md)。
+
 `BepInEx`、`dotnet`、`winhttp.dll` 與 `ドットアビスX.exe` 應位於同一個遊戲根目錄：
 
 ![覆蓋完成後的遊戲目錄](assets/install-after-copy.png)
