@@ -1,0 +1,27 @@
+name: Localization compatibility
+
+on:
+  push:
+    branches:
+      - main
+      - compat/abyssmod-translation
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.428'
+      - name: Build release plugin
+        run: dotnet build src/AbyssSniff.LocalizationCompat/AbyssSniff.LocalizationCompat.csproj --configuration Release
+      - name: Run unit and static checks
+        run: dotnet run --project tests/AbyssSniff.LocalizationCompat.Tests/AbyssSniff.LocalizationCompat.Tests.csproj --configuration Release -- $PWD
+      - name: Upload compatibility DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: AbyssSniff.LocalizationCompat
+          path: BepInEx/plugins/AbyssSniff/AbyssSniff.LocalizationCompat.dll
+          if-no-files-found: error
