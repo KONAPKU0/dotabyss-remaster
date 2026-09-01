@@ -17,6 +17,8 @@ jobs:
           dotnet-version: '6.0.428'
       - name: Build release plugin
         run: dotnet build src/AbyssSniff.LocalizationCompat/AbyssSniff.LocalizationCompat.csproj --configuration Release
+      - name: Build automation-only DLL patcher
+        run: dotnet build tools/AbyssSniff.AutomationOnly.Patcher/AbyssSniff.AutomationOnly.Patcher.csproj --configuration Release
       - name: Run unit and static checks
         run: dotnet run --project tests/AbyssSniff.LocalizationCompat.Tests/AbyssSniff.LocalizationCompat.Tests.csproj --configuration Release -- $PWD
       - name: Upload compatibility DLL
