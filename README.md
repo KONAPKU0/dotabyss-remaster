@@ -2,6 +2,8 @@
 
 《ドットアビスX》PC-X 版的免費玩家插件，提供掉落 Reroll、深淵自動化、戰鬥統計與多項遊戲修正。禁止商用，僅供技術學習及交流。
 
+> 本分支的 `AbyssSniff.dll` 是 **Automation Only** 版本：保留自動深淵、Abyss Code 選擇、掉落判定、自動刷裝備、災厄自動化及藍水晶自動施放；停用 Buff／異常狀態修正、角色體驗優化、防禦塔 AI、DPS／防禦／召喚等戰鬥補丁。`character_fixes_enabled` 與 `F4` 不再啟動任何戰鬥修正。安裝時只需覆蓋 `BepInEx/plugins/AbyssSniff/AbyssSniff.dll`，原有 `reroll_config.json` 和 `AbyssSniff.LocalizationCompat.dll` 保持不動。
+
 - 反饋及 Bug 提交：QQ `1057775708`
 - 支援：PC-X 版
 - 暫不支援：一般版、移動端
