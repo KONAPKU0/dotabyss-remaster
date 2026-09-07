@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - compat/abyssmod-translation
+      - codex/sync-upstream-*
   pull_request:
 
 jobs:
@@ -17,13 +18,18 @@ jobs:
           dotnet-version: '6.0.428'
       - name: Build release plugin
         run: dotnet build src/AbyssSniff.LocalizationCompat/AbyssSniff.LocalizationCompat.csproj --configuration Release
-      - name: Build automation-only DLL patcher
-        run: dotnet build tools/AbyssSniff.AutomationOnly.Patcher/AbyssSniff.AutomationOnly.Patcher.csproj --configuration Release
       - name: Run unit and static checks
         run: dotnet run --project tests/AbyssSniff.LocalizationCompat.Tests/AbyssSniff.LocalizationCompat.Tests.csproj --configuration Release -- $PWD
-      - name: Upload compatibility DLL
+      - name: Stage full upstream plugin and compatibility add-on
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .artifacts/release/BepInEx/plugins/AbyssSniff, .artifacts/release/BepInEx/config | Out-Null
+          Copy-Item -LiteralPath BepInEx/plugins/AbyssSniff/AbyssSniff.dll, BepInEx/plugins/AbyssSniff/AbyssSniff.LocalizationCompat.dll -Destination .artifacts/release/BepInEx/plugins/AbyssSniff
+          Copy-Item -LiteralPath BepInEx/config/BepInEx.cfg -Destination .artifacts/release/BepInEx/config
+          Copy-Item -LiteralPath 安裝說明.txt -Destination .artifacts/release
+      - name: Upload upgrade DLLs and configuration
         uses: actions/upload-artifact@v4
         with:
-          name: AbyssSniff.LocalizationCompat
-          path: BepInEx/plugins/AbyssSniff/AbyssSniff.LocalizationCompat.dll
+          name: AbyssSniff-v1.6.1-with-localization
+          path: .artifacts/release/
           if-no-files-found: error

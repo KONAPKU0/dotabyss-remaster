@@ -19,7 +19,7 @@ internal static class Program
             ("cache appearing and changing after startup reloads", CacheAutomaticallyReloads),
             ("missing, malformed, and duplicate translations fail open", InvalidCachesFailOpen),
             ("AbyssSniff patch targets still exist", () => ValidateAbyssSniffTargets(repoRoot)),
-            ("automation-only AbyssSniff disables combat startup patches", () => ValidateAutomationOnlyAbyssSniff(repoRoot)),
+            ("full upstream v1.6.1 DLL is preserved byte-for-byte", () => ValidateUpstreamAbyssSniff(repoRoot)),
             ("release plugin metadata and installation are valid", () => ValidateReleasePlugin(repoRoot))
         };
 
@@ -143,7 +143,7 @@ internal static class Program
         RequireMethod(assembly, "AbyssSniff.Reroll.AutoPlayer", "ScreenHasText", "System.Boolean", "System.String[]");
         RequireMethod(assembly, "AbyssSniff.Reroll.NetherBuffPicker", "ReadTmpField", "System.String", "System.Object", "System.String");
         RequireMethod(assembly, "AbyssSniff.Reroll.NetherBuffPicker", "CategoryOfName", "System.Int32", "System.String");
-        RequireMethod(assembly, "AbyssSniff.Reroll.NetherBuffPicker", "InfoOfName", null, "System.String");
+        RequireMethod(assembly, "AbyssSniff.Reroll.NetherBuffPicker", "InfoOfName", "AbyssSniff.Reroll.NetherBuffPicker/CodeInfo", "System.String");
         var confirm = RequireMethod(assembly, "AbyssSniff.Reroll.NetherBuffPicker", "ClickConfirmButton", "System.Boolean");
         AssertTrue(confirm.HasBody && confirm.Body.Instructions.Any(instruction =>
             instruction.Operand is MethodReference method &&
@@ -151,7 +151,20 @@ internal static class Program
             method.Name == "Trim"), "ClickConfirmButton string.Trim() patch point is missing");
         RequireMethod(assembly, "AbyssSniff.Reroll.ForceChainAuto", "NameAllowed", "System.Boolean", "System.String");
         var forceChain = RequireType(assembly, "AbyssSniff.Reroll.ForceChainAuto");
-        AssertTrue(forceChain.Fields.Any(field => field.Name == "AllowNames"), "ForceChainAuto.AllowNames is missing");
+        AssertTrue(forceChain.Fields.Any(field => field.Name == "AllowNames" && field.IsStatic), "ForceChainAuto.AllowNames is missing or not static");
+        // Harmony binds these prefix arguments by their names, not just their types.
+        foreach (var (typeName, methodName, parameterName) in new[]
+                 {
+                     ("AbyssSniff.Reroll.AutoPlayer", "ScreenHasText", "markers"),
+                     ("AbyssSniff.Reroll.NetherBuffPicker", "CategoryOfName", "name"),
+                     ("AbyssSniff.Reroll.NetherBuffPicker", "InfoOfName", "name"),
+                     ("AbyssSniff.Reroll.ForceChainAuto", "NameAllowed", "name")
+                 })
+        {
+            var method = RequireType(assembly, typeName).Methods.Single(candidate => candidate.Name == methodName);
+            AssertTrue(method.IsStatic && method.Parameters[0].Name == parameterName,
+                "Harmony prefix parameter contract changed: " + method.FullName);
+        }
     }
 
     private static void ValidateReleasePlugin(string repoRoot)
@@ -161,6 +174,12 @@ internal static class Program
         var pluginPath = Path.Combine(installDirectory, "AbyssSniff.LocalizationCompat.dll");
         AssertTrue(File.Exists(originalPath), "original AbyssSniff.dll was removed");
         AssertTrue(File.Exists(pluginPath), "release compatibility DLL is missing from the install directory");
+        var installedDlls = Directory.GetFiles(installDirectory, "*.dll", SearchOption.AllDirectories)
+            .Select(Path.GetFileName).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+        AssertTrue(installedDlls.SequenceEqual(new[] { "AbyssSniff.LocalizationCompat.dll", "AbyssSniff.dll" }),
+            "install directory must contain only the upstream plugin and localization add-on, without stale interop DLLs");
+        AssertTrue(File.Exists(Path.Combine(repoRoot, "BepInEx", "config", "BepInEx.cfg")),
+            "upstream v1.6.1 BepInEx logging configuration is missing");
 
         using var resolver = new DefaultAssemblyResolver();
         resolver.AddSearchDirectory(Path.Combine(repoRoot, "BepInEx", "core"));
@@ -187,92 +206,30 @@ internal static class Program
         AssertEqual("AbyssSniff", dependency!.ConstructorArguments[0].Value as string);
     }
 
-    private static void ValidateAutomationOnlyAbyssSniff(string repoRoot)
+    private static void ValidateUpstreamAbyssSniff(string repoRoot)
     {
         var path = Path.Combine(repoRoot, "BepInEx", "plugins", "AbyssSniff", "AbyssSniff.dll");
+        // Assert byte-for-byte upstream identity, not merely a version string. This
+        // prevents accidentally shipping the old automation-only or a repatched DLL.
+        AssertEqual(
+            "64AD4F817374111ADBB0D75E3A60E75E3000D59DFC02DCD69ACBDCDE53FE27F6",
+            Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path))));
         using var assembly = AssemblyDefinition.ReadAssembly(path);
         var plugin = RequireType(assembly, "AbyssSniff.Plugin");
-        var load = RequireMethod(assembly, "AbyssSniff.Plugin", "Load", "System.Void");
-        var calls = Calls(load).ToArray();
-
-        var disabled = new[]
-        {
-            "AbyssSniff.Patches.DefenceProbePatch.Initialize",
-            "AbyssSniff.Patches.DpsProbePatch.Initialize",
-            "AbyssSniff.Patches.AccessoryProbePatch.Initialize",
-            "AbyssSniff.Patches.AbnormalConditionFixPatch.Initialize",
-            "AbyssSniff.Patches.BuffBugFixPatch.Initialize",
-            "AbyssSniff.Patches.AutoDefensiveTowerPatch.Initialize",
-            "AbyssSniff.Patches.LaveriaTeamKillFixPatch.Initialize",
-            "AbyssSniff.Patches.AttackContinuousProbePatch.Initialize",
-            "AbyssSniff.Patches.SylviaSummonProbePatch.Initialize",
-            "AbyssSniff.Patches.ExplorationMissionBadgeFixPatch.Initialize",
-            "AbyssSniff.Patches.ManaGemUnequipPatch.Initialize",
-            "AbyssSniff.Reroll.UpdateNotifier.Initialize"
-        };
-        foreach (var call in disabled)
-        {
-            AssertTrue(!calls.Contains(call, StringComparer.Ordinal), "combat startup call remains: " + call);
-        }
-
-        var required = new[]
-        {
-            "AbyssSniff.Patches.ApiSniffPatch.Initialize",
-            "AbyssSniff.Reroll.NetherCheckpointPatch.Initialize",
-            "AbyssSniff.Reroll.DropAnalyzer.Initialize"
-        };
-        foreach (var call in required)
-        {
-            AssertContains(calls, call);
-        }
-
-        var dropInitialize = RequireMethod(
-            assembly,
-            "AbyssSniff.Reroll.DropAnalyzer",
-            "Initialize",
-            "System.Void");
-        AssertTrue(
-            !Calls(dropInitialize).Contains(
-                "AbyssSniff.Reroll.CharacterFixes.Initialize",
-                StringComparer.Ordinal),
-            "CharacterFixes.Initialize remains active");
-
-        var dispatcherUpdate = RequireMethod(
-            assembly,
-            "AbyssSniff.Reroll.MainThreadDispatcher",
-            "Update",
-            "System.Void");
-        var updateCalls = Calls(dispatcherUpdate).ToArray();
-        AssertContains(updateCalls, "AbyssSniff.Reroll.ForceChainAuto.Tick");
-        AssertTrue(
-            !updateCalls.Contains("AbyssSniff.Reroll.CharacterFixes.Toggle", StringComparer.Ordinal),
-            "F4 character-fix toggle remains active");
-        AssertTrue(
-            !updateCalls.Contains("AbyssSniff.Patches.ManaGemUnequipPatch.Tick", StringComparer.Ordinal),
-            "mana-gem unequip observer remains active");
-
-        var dispatcherOnGui = RequireMethod(
-            assembly,
-            "AbyssSniff.Reroll.MainThreadDispatcher",
-            "OnGUI",
-            "System.Void");
-        var guiCalls = Calls(dispatcherOnGui).ToArray();
-        foreach (var disabledGui in new[]
-                 {
-                     "AbyssSniff.Patches.BossResistanceOverlay.OnGUI",
-                     "AbyssSniff.Patches.DpsOverlay.OnGUI",
-                     "AbyssSniff.Reroll.UpdateNotifier.OnGUI"
-                 })
-        {
-            AssertTrue(!guiCalls.Contains(disabledGui, StringComparer.Ordinal), "combat UI call remains: " + disabledGui);
-        }
-        AssertContains(guiCalls, "AbyssSniff.Reroll.RerollPanel.OnGUI");
-
         var metadata = plugin.CustomAttributes.Single(attribute =>
             attribute.AttributeType.FullName == "BepInEx.BepInPlugin");
         AssertEqual("AbyssSniff", metadata.ConstructorArguments[0].Value as string);
-        AssertEqual("AbyssSniff Automation Only", metadata.ConstructorArguments[1].Value as string);
-        AssertEqual("1.6.0-automation.1", metadata.ConstructorArguments[2].Value as string);
+        AssertEqual("AbyssSniff", metadata.ConstructorArguments[1].Value as string);
+        AssertEqual("1.6.1", metadata.ConstructorArguments[2].Value as string);
+        var load = RequireMethod(assembly, "AbyssSniff.Plugin", "Load", "System.Void");
+        foreach (var required in new[]
+                 {
+                     "AbyssSniff.Patches.InteropBindingAudit.Initialize",
+                     "AbyssSniff.Patches.ApiSniffPatch.Initialize",
+                     "AbyssSniff.Reroll.NetherCheckpointPatch.Initialize",
+                     "AbyssSniff.Reroll.DropAnalyzer.Initialize"
+                 })
+            AssertContains(Calls(load), required);
     }
 
     private static IEnumerable<string> Calls(MethodDefinition method)
