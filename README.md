@@ -2,7 +2,7 @@
 
 《ドットアビスX》PC-X 版的免費玩家插件，提供掉落 Reroll、深淵自動化、戰鬥統計與多項遊戲修正。禁止商用，僅供技術學習及交流。
 
-> 本分支的 `AbyssSniff.dll` 是 **Automation Only** 版本：保留自動深淵、Abyss Code 選擇、掉落判定、自動刷裝備、災厄自動化及藍水晶自動施放；停用 Buff／異常狀態修正、角色體驗優化、防禦塔 AI、DPS／防禦／召喚等戰鬥補丁。`character_fixes_enabled` 與 `F4` 不再啟動任何戰鬥修正。安裝時只需覆蓋 `BepInEx/plugins/AbyssSniff/AbyssSniff.dll`，原有 `reroll_config.json` 和 `AbyssSniff.LocalizationCompat.dll` 保持不動。
+> 本 fork 使用上游 **完整 v1.6.1** 的 `AbyssSniff.dll`，另附 `AbyssSniff.LocalizationCompat.dll` 提供中日名稱相容，不再製作 Automation Only 精簡版。戰鬥功能、`character_fixes_enabled` 與 `F4` 均遵循上游行為。升級時請依下方步驟清理舊 DLL，保留個人設定與漢化快取。
 
 - 反饋及 Bug 提交：QQ `1057775708`
 - 支援：PC-X 版
@@ -47,8 +47,20 @@
 
 ## 安裝
 
+### 舊版升級至 v1.6.1
+
+遊戲更新後，舊插件資料夾內殘留的 DLL 會造成進入深淵或選擇樓層時閃退。**舊版使用者請先完成以下步驟，再依下方流程安裝。**
+
 1. 關閉遊戲與 DMM GAME PLAYER。
-2. 到 [Releases](../../releases) 下載最新版的 `Source code (zip)` 並解壓縮。
+2. 將遊戲目錄中的整個 `BepInEx\plugins\AbyssSniff` 資料夾移到桌面備份；備份必須放在 `BepInEx` 以外。
+3. 安裝新版後，可從備份還原 `reroll_config.json` 與 `data` 內的個人設定檔；不要還原任何 DLL、舊 `Release` 資料夾或診斷 marker。
+
+本 fork 的 `BepInEx\plugins\AbyssSniff` 內應有兩個 DLL：`AbyssSniff.dll` 和 `AbyssSniff.LocalizationCompat.dll`，請使用本 fork 提供的檔案。`Project.dll` 等遊戲 interop DLL 由 BepInEx 自動生成，不能放回插件資料夾。不要搬動或清除 `BepInEx\plugins\AbyssMod`，漢化插件與快取保留原樣。
+
+### 安裝流程
+
+1. 關閉遊戲與 DMM GAME PLAYER。
+2. 到本 fork 下載合併後的 `main`（Code → Download ZIP），或下載對應 PR 的 [Actions](../../actions/workflows/localization-compat.yml) 成品 `AbyssSniff-v1.6.1-with-localization`。不要使用仍指向舊版的 Release。
 3. 將版本資料夾內的所有檔案複製到遊戲目錄：
 
    ```text
@@ -61,11 +73,13 @@
 
 版本檢查無法連線時會靜默跳過，不會影響遊戲啟動或自動化功能。
 
+正式版預設關閉插件日誌、BepInEx 磁碟日誌與 Console，停用封包／DPS dump 及掉落診斷檔寫入；設定保存與更新提醒狀態仍會正常保存。請一併覆蓋包內的 `BepInEx\config\BepInEx.cfg`，不要還原舊日誌設定。
+
 ### AbyssMod 簡體中文漢化相容
 
 發布內容包含 `BepInEx/plugins/AbyssSniff/AbyssSniff.LocalizationCompat.dll`。安裝 [AbyssMod](https://github.com/anosu/AbyssMod) 及其簡體中文翻譯後，兼容插件會從本機 `BepInEx/plugins/AbyssMod/cache/*/static.json` 和 `ui_texts.json` 建立中日雙向別名，讓自動深淵、Code 類別與按鈕判定繼續工作，也讓 `force_chain_allow_names` 的中文或日文水晶名稱互相匹配。
 
-兼容插件不連線、不修改漢化檔案，也不新增 `reroll_config.json` 欄位；沒有漢化快取時會保持原本的日文行為。快取稍後產生或更新會自動重載，缺失或損壞則安全跳過。若功能沒有生效，請確認上述快取路徑存在，並在 `BepInEx/LogOutput.log` 搜尋 `[LocalizationCompat]`。完整技術說明與驗收清單見 [AbyssMod 中日名稱相容層](docs/localization-compatibility.md)。
+兼容插件不連線、不修改漢化檔案，也不新增 `reroll_config.json` 欄位；沒有漢化快取時會保持原本的日文行為。快取稍後產生或更新會自動重載，缺失或損壞則安全跳過。若功能沒有生效，先確認快取路徑及兩個 DLL 都存在。v1.6.1 預設不寫磁碟日誌；如需排查，請依 [故障排查](docs/localization-compatibility.md#故障排查) 暫時開啟日誌後再搜尋 `[LocalizationCompat]`。完整技術說明與驗收清單也在該文件。
 
 `BepInEx`、`dotnet`、`winhttp.dll` 與 `ドットアビスX.exe` 應位於同一個遊戲根目錄：
 
@@ -85,8 +99,8 @@
 ## Bug 修正
 
 - 修正探索活動任務完成後沒有紅點提示的問題；有可領取獎勵時會顯示紅點，戰鬥完成或領取獎勵後會自動更新。
-- 負面狀態施加失敗時，不再錯誤清除已成功施加的負面狀態。
-- 修正戰鬥中連擊率提升 Buff 實質不生效。
+- 適配 2026-09-07 遊戲更新，修正進入深淵／選擇樓層時因過期 DLL 載入而閃退的問題；舊版升級需依上方說明清理殘留檔案。
+- 官方已修復的負面狀態覆蓋與連擊率 Buff 問題，停用對應舊修補，避免與新版遊戲衝突。
 - 修正「漆黑之杖」的負面狀態提升 Buff 效果與說明不同，現在可以正常疊加。
 - 修正 LE「深蝕のツルハシ」的開場情熱效果：現在只會對火／水／土屬性角色生效，不再覆蓋光／闇／無屬性角色原有的衝擊紋章。
 
